@@ -3,10 +3,17 @@ from google import genai
 import os
 import docx  # Para leer archivos .docx de forma nativa
 import traceback
+import chromadb
 from dotenv import load_dotenv
 
 load_dotenv()
 client = genai.Client()
+
+
+CHROMA_PATH = "./chroma_db"
+chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
+collection = chroma_client.get_or_create_collection(name="documentos_taller")
+
 
 app = FastAPI(title="Motor IA - Ingesta Robusta")
 
@@ -42,9 +49,25 @@ async def ingest_document(
         vector = response.embeddings[0].values
         print(f"[3] Embedding exitoso. Dimensión: {len(vector)}")
 
+        print(f"[4] Guardando en ChromaDB (Grupo: {group_id}, Categoría: {category})...")
+        collection.add(
+            ids=[file.filename],                    
+            embeddings=[vector],                   
+            documents=[texto_limpio],                
+            metadatas=[{                              
+                "group_id": group_id, 
+                "category": category
+            }]
+        )
+        print("[5] ¡Guardado en ChromaDB exitoso!")
+
         if os.path.exists(temp_path): os.remove(temp_path)
 
-        return {"status": "success", "dimension": len(vector)}
+        return {
+            "status": "success", 
+            "dimension": len(vector),
+            "message": "Documento indexado en BD Vectorial"
+            }
 
     except Exception as e:
         traceback.print_exc()
