@@ -1,8 +1,13 @@
+# main.py
 from fastapi import FastAPI
-from routes import router  # Importamos el router que contiene los endpoints
+from routers import ingest, search, inspect
 
-# Inicializamos la aplicación de FastAPI
-app = FastAPI(title="Motor IA - RAG Modular Seguro")
+print("🚀 [MAIN] Iniciando servidor FastAPI - Arquitectura Modular")
+app = FastAPI(title="Motor IA - RAG Modular y Seguro")
 
-# Registramos las rutas del proyecto
-app.include_router(router)
+# Registramos las rutas de cada módulo independiente
+app.include_router(ingest.router)
+app.include_router(search.router)
+app.include_router(inspect.router)
+
+print("✅ [MAIN] Todos los módulos registrados. ¡Listo para recibir peticiones!\n")
