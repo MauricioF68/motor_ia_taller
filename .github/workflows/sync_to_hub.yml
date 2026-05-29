@@ -17,6 +17,5 @@ jobs:
       - name: Push to Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push https://mauriciof68:$HF_TOKEN@huggingface.co/spaces/mauriciof68/motor-ia-taller 
-            git push --force space main
-        
+        # Aquí está el cambio clave: HEAD:main
+        run: git push --force https://mauriciof68:${HF_TOKEN}@huggingface.co/spaces/mauriciof68/motor-ia-taller HEAD:main
