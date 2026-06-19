@@ -28,36 +28,41 @@ async def search_document(request: SearchRequest):
         
         contexto = ""
         
-        if request.category is not None:
-            print("🧠 [RAG] 1. Convirtiendo pregunta a vector...")
-            response_emb = client.models.embed_content(
-                model=MODELO_EMBEDDING,
-                contents=request.pregunta
-            )
-            vector_pregunta = response_emb.embeddings[0].values
+        print("🧠 [RAG] 1. Convirtiendo pregunta a vector...")
+        response_emb = client.models.embed_content(
+            model=MODELO_EMBEDDING,
+            contents=request.pregunta
+        )
+        vector_pregunta = response_emb.embeddings[0].values
 
-            print("🗄️ [RAG] 2. Buscando fragmentos en ChromaDB (Aplicando filtros estrictos)...")
-            resultados = collection.query(
-                query_embeddings=[vector_pregunta],
-                n_results=1, 
-                where={
-                    "$and": [
-                        {"group_id": {"$eq": request.group_id}},
-                        {"category": {"$eq": request.category}}
-                    ]
-                }
-            )
+        print(f"🗄️ [RAG] 2. Buscando fragmentos en ChromaDB para el grupo {request.group_id}...")
+        
+        # Preparar filtro base (siempre por group_id)
+        where_filter = {"group_id": {"$eq": request.group_id}}
+        
+        # Si se envía categoría específica, usamos un $and
+        if request.category:
+            where_filter = {
+                "$and": [
+                    {"group_id": {"$eq": request.group_id}},
+                    {"category": {"$eq": request.category}}
+                ]
+            }
 
-            documentos_encontrados = resultados.get("documents", [[]])[0]
-            
-            if not documentos_encontrados:
-                print("⚠️ [RAG] RESULTADO: No existen documentos vectorizados para este filtro.")
-                contexto = "No se encontraron documentos adicionales en la base de datos para este tema."
-            else:
-                contexto = "\n".join(documentos_encontrados)
-                print("📝 [RAG] 3. Contexto recuperado.")
+        resultados = collection.query(
+            query_embeddings=[vector_pregunta],
+            n_results=5, # Aumentado a 5 para traer mayor contexto de varios fragmentos
+            where=where_filter
+        )
+
+        documentos_encontrados = resultados.get("documents", [[]])[0]
+        
+        if not documentos_encontrados:
+            print("⚠️ [RAG] RESULTADO: No existen documentos vectorizados para este filtro.")
+            contexto = "" # Dejarlo vacío para que se use solo el agile_context
         else:
-            print("⏩ [RAG] 1-2. Categoría es nula. Omitiendo búsqueda en ChromaDB.")
+            contexto = "\n".join(documentos_encontrados)
+            print(f"📝 [RAG] 3. Contexto recuperado ({len(documentos_encontrados)} fragmentos).")
 
         print("📝 [RAG] 3/4. Preparando historial y contexto para el LLM...")
         
@@ -76,14 +81,19 @@ async def search_document(request: SearchRequest):
         # 2. Preparar el prompt de la pregunta actual
         if contexto:
             prompt = f"""
-Eres un asistente experto para estudiantes universitarios de taller de ingeniería. 
-Responde la pregunta basándote en el siguiente contexto extraído de sus documentos guardados, si es relevante. 
-Si la respuesta no está explícita en el contexto, indica amablemente que no dispones de esa información en los archivos cargados.
+Eres un asistente experto y un auditor de proyectos de ingeniería.
+Se te proporciona información de un grupo de estudiantes de dos fuentes distintas:
+1. **Contexto de Documentos** (extraído de la base de datos vectorial con sus entregables oficiales).
+2. **Progreso Ágil** (Backlog y Dailys), el cual recibes como instrucciones de sistema.
 
-Contexto recuperado de la base de datos:
+Tu objetivo principal es responder a la Consulta de manera clara y precisa basándote en ambas fuentes.
+- Si la consulta es de tipo general, utiliza la información de los documentos o del progreso ágil para responder.
+- Si la consulta requiere evaluar el avance, realiza un análisis comparativo y crítico cruzando el progreso real (backlog/dailys) con lo planificado (documentos).
+
+Contexto de Documentos:
 {contexto}
 
-Pregunta del estudiante: {request.pregunta}
+Consulta a responder: {request.pregunta}
 """
         else:
             prompt = request.pregunta
