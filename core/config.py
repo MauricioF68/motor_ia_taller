@@ -11,7 +11,7 @@ load_dotenv()
 print("⚙️ [CONFIG] Inicializando cliente de Google Gemini...")
 client = genai.Client()
 MODELO_EMBEDDING = "models/gemini-embedding-2"
-MODELO_TEXTO = "models/gemini-2.5-flash"
+MODELO_TEXTO = "models/gemini-2.0-flash"
 
 # Inicialización Persistente de ChromaDB
 print("⚙️ [CONFIG] Conectando con la base de datos vectorial ChromaDB...")
